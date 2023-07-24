@@ -1,0 +1,165 @@
+##----------------------------------------------------------------------------##
+# Add Simulation Info! #
+##----------------------------------------------------------------------------##
+
+##----------------------------------------------------------------------------##
+clear
+##----------------------------------------------------------------------------##
+
+##---------------------------Variable Setup-----------------------------------##
+variable timestep equal 0.0025
+variable stencil_points equal 3
+variable Temp equal 300
+variable Volume equal 24^3
+variable		PRate	equal	1.0e-1	# Pull rate of the tensile deformation in A/ps
+variable		N		equal	1e3		# Data & dump ouptput frequency
+variable		NEvery	equal	1						# Use input values every this many timesteps
+variable		NRepeat	equal	$N/10					# No. of times to use input values for calculating averages
+variable		NFreq	equal	${NEvery}*${NRepeat}	# Calculate averages every this many timesteps
+variable		ETens	equal	${PRate}*time/7.68
+variable		EZZ		equal	v_ETens
+
+##----------------------------------------------------------------------------##
+
+##-----------------------Simulation Space Setup-------------------------------##
+units          micro
+dimension      3
+boundary       p p f
+atom_style     molecular
+##----------------------------------------------------------------------------##
+
+##--------------------Reading Cell Atom Data + Setting Masses -----------------##
+read_data Bonding_Test_V4.2.data extra/atom/types 2
+
+mass * 1
+
+neighbor 3.5 bin
+write_data alskd;fjakl.data
+##----------------------------------------------------------------------------##
+
+##-----------------------Group Setup------------------------------------------##
+region Right_Grip block 57 63 EDGE EDGE EDGE EDGE
+region Left_Grip block  40 43 EDGE EDGE EDGE EDGE
+region Cell_Body block  43 50 EDGE EDGE EDGE EDGE
+#region Upper_Grip block -1 1.5 3 EDGE EDGE EDGE
+#region Lower_Grip block -1 1 EDGE -3 EDGE EDGE
+
+
+group Right_Grip region Right_Grip
+group Left_Grip region Left_Grip
+#group Cell_Body region Cell_Body
+#group Upper_Grip region Upper_Grip
+#group Lower_Grip region Lower_Grip
+group Cell type 1 1
+set group Right_Grip type 2
+set group Left_Grip type 3
+#set group Upper_Grip type 4
+#set group Lower_Grip type 5
+#group cell union Upper_Grip Lower_Grip Cell_1
+##-------------------Pair and Bond Style and Coeff Setup-----------------------##
+pair_style	bpm/spring
+pair_coeff	 * * 0.0 1.0 1.0
+bond_style harmonic
+bond_coeff 1 10e-3 0.8
+create_bonds many Cell Cell 1 0.0001 1    # Create Bonds here bc coeffs need to be set first
+angle_style cosine/periodic
+angle_coeff * 75.0 1 6
+dump			output		all		custom	100	dump.e3 id	type x y z vx	vy	vz	fx	fy	fz
+min_style cg
+minimize 1e-7 1e-7 1000 1000
+fix mysf1 Right_Grip setforce -0 NULL 0
+fix mysf2 Left_Grip  setforce 0 NULL 0
+#velocity Right_Grip set 0 NULL 0
+velocity Left_Grip set -0.0500 NULL 0
+velocity Right_Grip set 0.0500 NULL 0
+##-------------------------------------
+##----------------------------------------------------------------------------##
+##---------------------------------Fixes--------------------------------------##
+#fix   FL all lb/fluid 1 1.0 1 stencil ${stencil_points} dx 0.12 dm .001 noise 300.0 2759 #zwall_velocity 1 -1 #dumpxdmf 500 fflow 0
+#fix   2 all lb/viscous
+fix   3 all nve
+#$fix   4 all lb/momentum 1
+
+compute			Stress	Cell	stress/atom	NULL
+compute			BodySt	Cell	reduce	sum	c_Stress[1]
+compute			BodyStrain	Cell	reduce	sum	c_Stress[4]
+compute         force   all  property/atom fx fy fz
+compute 		FX	    all	reduce	sum	c_force[1] #c_force[2] c_force[3]
+compute			FY	    all	reduce	sum	c_force[2]
+compute			FZ		all reduce	sum	c_force[3]
+compute         centerm1 Left_Grip com
+#compute         CM1 Left_Grip reduce sum c_centerm1
+compute         centerm2 Right_Grip com
+#compute         centerm3 Upper_Grip com
+#compute         centerm4 Lower_Grip com
+
+#compute         CM2 Right_Grip reduce sum c_centerm2
+#compute         potential Cell_Body pe/atom
+#compute			pe	Cell_Body	reduce	sum	c_potential[1]
+
+variable		SigZZ	equal	c_BodySt/(${Volume}*10^-9)  #outputs in microNewton/meter
+variable		SZZ		equal	v_SigZZ
+variable		ShearXX	equal	c_BodyStrain/(${Volume}*10^-9)  #outputs in microNewton/meter
+variable		SXX		equal	v_ShearXX
+variable        Fx equal c_FX
+variable        Fy equal c_FY
+variable        Fz equal c_FZ
+variable        leftpos  equal c_centerm1[1]
+variable        rightpos equal c_centerm2[1]
+variable        diameter  equal "v_leftpos-v_rightpos"
+variable        straindummy2      equal "v_diameter-7.68"
+variable        strain       equal v_straindummy2/7.68
+#variable        uptops      equal c_centerm3[2]
+#variable        downlo      equal c_centerm4[2]
+#variable        displacement   equal "v_uptops-v_downlo"
+#variable        compression     equal "v_displacement-7.3"
+#variable        poisson         equal v_compression/7.3
+
+
+
+#variable        Pe  equal c_potential
+#v_force[2] v_force[3]
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
+##--------------------Final Run Settings + Start------------------------------##
+timestep    ${timestep}
+thermo      10000
+thermo_style custom step etotal  press  v_SZZ v_SXX v_strain v_Fx v_Fy v_Fz
+#run_style verlet
+
+#dump_modify output element cell
+fix				mNm2		all		ave/time	${NEvery}	${NRepeat}	${NFreq} v_ETens	v_SZZ v_SXX	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter  file	out.straine3.csv
+neigh_modify every 2 delay 10 check yes page 100000
+run         10000
+
+velocity Left_Grip set -0.0500 NULL 0
+velocity Right_Grip set 0.0500 NULL 0
+
+run 10000
+
+velocity Left_Grip set 0.0500 NULL 0
+velocity Right_Grip set -0.0500 NULL 0
+
+run 100000
+
+#velocity Left_Grip set -0.0500 NULL 0
+#velocity Right_Grip set 0.0500 NULL 0
+
+#run 10000
+
+#velocity Left_Grip set 0.0500 NULL 0
+#velocity Right_Grip set -0.0500 NULL 0
+
+#run 10000
+
+
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
+
+
+##velocity Right_Grip set 0.0500 NULL 0
+##velocity Left_Grip set -0.0500 NULL 0
+
+##fix				GPa2	all		ave/time	${NEvery}	${NRepeat}	${NFreq} 	v_SZZ	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter file	out.contract.csv
+
+##run         50000

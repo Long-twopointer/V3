@@ -1,0 +1,405 @@
+LAMMPS (2 Jun 2022)
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+##----------------------------------------------------------------------------##
+# Add Simulation Info! #
+##----------------------------------------------------------------------------##
+
+##----------------------------------------------------------------------------##
+clear
+OMP_NUM_THREADS environment is not set. Defaulting to 1 thread. (src/comm.cpp:98)
+  using 1 OpenMP thread(s) per MPI task
+##----------------------------------------------------------------------------##
+
+##---------------------------Variable Setup-----------------------------------##
+variable timestep equal 0.0025
+variable stencil_points equal 3
+variable Temp equal 300
+variable Volume equal 24^3
+variable		PRate	equal	1.0e-1	# Pull rate of the tensile deformation in A/ps
+variable		N		equal	1e3		# Data & dump ouptput frequency
+variable		NEvery	equal	1						# Use input values every this many timesteps
+variable		NRepeat	equal	$N/10					# No. of times to use input values for calculating averages
+variable		NRepeat	equal	1000/10					
+variable		NFreq	equal	${NEvery}*${NRepeat}	# Calculate averages every this many timesteps
+variable		NFreq	equal	1*${NRepeat}	
+variable		NFreq	equal	1*100	
+variable		ETens	equal	${PRate}*time/7.68
+variable		ETens	equal	0.1*time/7.68
+variable		EZZ		equal	v_ETens
+
+##----------------------------------------------------------------------------##
+
+##-----------------------Simulation Space Setup-------------------------------##
+units          micro
+dimension      3
+boundary       p p f
+atom_style     molecular
+##----------------------------------------------------------------------------##
+
+##--------------------Reading Cell Atom Data + Setting Masses -----------------##
+read_data Bonding_Test_V4.2.data extra/atom/types 2
+Reading data file ...
+  orthogonal box = (0 0 0) to (100 100 100)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  930 atoms
+  scanning bonds ...
+  5 = max bonds/atom
+  reading bonds ...
+  2184 bonds
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     9 = max # of 1-2 neighbors
+    57 = max # of 1-3 neighbors
+   390 = max # of 1-4 neighbors
+    39 = max # of special neighbors
+  special bonds CPU = 0.007 seconds
+  read_data CPU = 0.032 seconds
+
+mass * 1
+
+neighbor 3.5 bin
+write_data alskd;fjakl.data
+System init for write_data ...
+WARNING: Bonds are defined but no bond style is set (src/force.cpp:192)
+WARNING: Likewise 1-2 special neighbor interactions != 1.0 (src/force.cpp:194)
+WARNING: Communication cutoff is 0.0. No ghost atoms will be generated. Atoms may get lost. (src/comm_brick.cpp:210)
+##----------------------------------------------------------------------------##
+
+##-----------------------Group Setup------------------------------------------##
+region Right_Grip block 57 63 EDGE EDGE EDGE EDGE
+region Left_Grip block  40 43 EDGE EDGE EDGE EDGE
+region Cell_Body block  43 50 EDGE EDGE EDGE EDGE
+#region Upper_Grip block -1 1.5 3 EDGE EDGE EDGE
+#region Lower_Grip block -1 1 EDGE -3 EDGE EDGE
+
+
+group Right_Grip region Right_Grip
+149 atoms in group Right_Grip
+group Left_Grip region Left_Grip
+149 atoms in group Left_Grip
+#group Cell_Body region Cell_Body
+#group Upper_Grip region Upper_Grip
+#group Lower_Grip region Lower_Grip
+group Cell type 1 1
+930 atoms in group Cell
+set group Right_Grip type 2
+Setting atom values ...
+  149 settings made for type
+set group Left_Grip type 3
+Setting atom values ...
+  149 settings made for type
+#set group Upper_Grip type 4
+#set group Lower_Grip type 5
+#group cell union Upper_Grip Lower_Grip Cell_1
+##-------------------Pair and Bond Style and Coeff Setup-----------------------##
+pair_style	bpm/spring
+pair_coeff	 * * 0.0 1.0 1.0
+bond_style harmonic
+bond_coeff 1 10e-3 0.8
+create_bonds many Cell Cell 1 0.0001 1    # Create Bonds here bc coeffs need to be set first
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update every 1 steps, delay 10 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 4.5
+  ghost atom cutoff = 4.5
+  binsize = 2.25, bins = 45 45 45
+  2 neighbor lists, perpetual/occasional/extra = 1 1 0
+  (1) command create_bonds, occasional
+      attributes: full, newton on
+      pair build: full/bin
+      stencil: full/bin/3d
+      bin: standard
+  (2) pair bpm/spring, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Communication cutoff 4.5 is shorter than a bond length based estimate of 4.7. This may lead to errors. (src/comm.cpp:727)
+Added 0 bonds, new total = 2184
+Finding 1-2 1-3 1-4 neighbors ...
+  special bond factors lj:    0        0        0       
+  special bond factors coul:  0        0        0       
+     9 = max # of 1-2 neighbors
+    57 = max # of 1-3 neighbors
+   390 = max # of 1-4 neighbors
+    39 = max # of special neighbors
+  special bonds CPU = 0.009 seconds
+dump			output		all		custom	100	dump.e3 id	type x y z vx	vy	vz	fx	fy	fz
+min_style cg
+minimize 1e-7 1e-7 1000 1000
+WARNING: Using 'neigh_modify every 1 delay 0 check yes' setting during minimization (src/min.cpp:187)
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+Neighbor list info ...
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 4.5
+  ghost atom cutoff = 4.5
+  binsize = 2.25, bins = 45 45 45
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair bpm/spring, perpetual
+      attributes: half, newton on
+      pair build: half/bin/newton
+      stencil: half/bin/3d
+      bin: standard
+WARNING: Communication cutoff 4.5 is shorter than a bond length based estimate of 4.7. This may lead to errors. (src/comm.cpp:727)
+Per MPI rank memory allocation (min/avg/max) = 11.83 | 11.83 | 11.83 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0              0              5.4451478      5.4451478     -8.6158493e-06
+      1000   0              0              0.29734013     0.29734013    -1.1389545e-06
+Loop time of 0.180121 on 1 procs for 1000 steps with 930 atoms
+
+86.7% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+Minimization stats:
+  Stopping criterion = max force evaluations
+  Energy initial, next-to-last, final = 
+      5.44514776315993  0.297823296136006  0.297340125547298
+  Force two-norm initial, final = 0.45844454 0.021963642
+  Force max component initial, final = 0.032134979 0.0011498229
+  Final line search alpha, max atom move = 1 0.0011498229
+  Iterations, force evaluations = 1000 1000
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.061806   | 0.061806   | 0.061806   |   0.0 | 34.31
+Bond    | 0.051215   | 0.051215   | 0.051215   |   0.0 | 28.43
+Neigh   | 0.0016152  | 0.0016152  | 0.0016152  |   0.0 |  0.90
+Comm    | 0.0019958  | 0.0019958  | 0.0019958  |   0.0 |  1.11
+Output  | 0.029218   | 0.029218   | 0.029218   |   0.0 | 16.22
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 0.03427    |            |       | 19.03
+
+Nlocal:            930 ave         930 max         930 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          15606 ave       15606 max       15606 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 15606
+Ave neighs/atom = 16.780645
+Ave special neighs/atom = 24.477419
+Neighbor list builds = 1
+Dangerous builds = 0
+fix mysf1 Right_Grip setforce -0 NULL 0
+fix mysf2 Left_Grip  setforce 0 NULL 0
+#velocity Right_Grip set 0 NULL 0
+velocity Left_Grip set -0.0500 NULL 0
+velocity Right_Grip set 0.0500 NULL 0
+##-------------------------------------
+##----------------------------------------------------------------------------##
+##---------------------------------Fixes--------------------------------------##
+#fix   FL all lb/fluid 1 1.0 1 stencil ${stencil_points} dx 0.12 dm .001 noise 300.0 2759 #zwall_velocity 1 -1 #dumpxdmf 500 fflow 0
+#fix   2 all lb/viscous
+fix   3 all nve
+#$fix   4 all lb/momentum 1
+
+compute			Stress	Cell	stress/atom	NULL
+compute			BodySt	Cell	reduce	sum	c_Stress[1]
+compute			BodyStrain	Cell	reduce	sum	c_Stress[4]
+compute         force   all  property/atom fx fy fz
+compute 		FX	    all	reduce	sum	c_force[1] #c_force[2] c_force[3]
+compute			FY	    all	reduce	sum	c_force[2]
+compute			FZ		all reduce	sum	c_force[3]
+compute         centerm1 Left_Grip com
+#compute         CM1 Left_Grip reduce sum c_centerm1
+compute         centerm2 Right_Grip com
+#compute         centerm3 Upper_Grip com
+#compute         centerm4 Lower_Grip com
+
+#compute         CM2 Right_Grip reduce sum c_centerm2
+#compute         potential Cell_Body pe/atom
+#compute			pe	Cell_Body	reduce	sum	c_potential[1]
+
+variable		SigZZ	equal	c_BodySt/(${Volume}*10^-9)  #outputs in microNewton/meter
+variable		SigZZ	equal	c_BodySt/(13824*10^-9)  
+variable		SZZ		equal	v_SigZZ
+variable		ShearXX	equal	c_BodyStrain/(${Volume}*10^-9)  #outputs in microNewton/meter
+variable		ShearXX	equal	c_BodyStrain/(13824*10^-9)  
+variable		SXX		equal	v_ShearXX
+variable        Fx equal c_FX
+variable        Fy equal c_FY
+variable        Fz equal c_FZ
+variable        leftpos  equal c_centerm1[1]
+variable        rightpos equal c_centerm2[1]
+variable        diameter  equal "v_leftpos-v_rightpos"
+variable        straindummy2      equal "v_diameter-7.68"
+variable        strain       equal v_straindummy2/7.68
+#variable        uptops      equal c_centerm3[2]
+#variable        downlo      equal c_centerm4[2]
+#variable        displacement   equal "v_uptops-v_downlo"
+#variable        compression     equal "v_displacement-7.3"
+#variable        poisson         equal v_compression/7.3
+
+
+
+#variable        Pe  equal c_potential
+#v_force[2] v_force[3]
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
+##--------------------Final Run Settings + Start------------------------------##
+timestep    ${timestep}
+timestep    0.0025
+thermo      10000
+thermo_style custom step etotal  press  v_SZZ v_SXX v_strain v_Fx v_Fy v_Fz
+#run_style verlet
+
+#dump_modify output element cell
+fix				mNm2		all		ave/time	${NEvery}	${NRepeat}	${NFreq} v_ETens	v_SZZ v_SXX	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter  file	out.straine3.csv
+fix				mNm2		all		ave/time	1	${NRepeat}	${NFreq} v_ETens	v_SZZ v_SXX	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter  file	out.straine3.csv
+fix				mNm2		all		ave/time	1	100	${NFreq} v_ETens	v_SZZ v_SXX	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter  file	out.straine3.csv
+fix				mNm2		all		ave/time	1	100	100 v_ETens	v_SZZ v_SXX	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter  file	out.straine3.csv
+neigh_modify every 2 delay 10 check yes page 100000
+run         10000
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 4.5 is shorter than a bond length based estimate of 4.7. This may lead to errors. (src/comm.cpp:727)
+Per MPI rank memory allocation (min/avg/max) = 12.21 | 12.21 | 12.21 Mbytes
+   Step         TotEng         Press          v_SZZ          v_SXX         v_strain         v_Fx           v_Fy           v_Fz     
+      1000   0.66984013    -8.9062118e-07  28497.867      38566.071     -2.8536916     -1.1920238e-15 -3.8441222e-17 -5.793736e-16 
+     10000   1.3277027     -1.1981706e-06  100917.43      50853.745     -3.1466603      2.1047888e-15  8.9433127e-17  8.1748844e-16
+     11000   1.4062164     -1.1895087e-06  105440.9       49933.986     -3.1792124      3.5409501e-15 -5.233986e-17   1.2453146e-15
+Loop time of 3.00469 on 1 procs for 10000 steps with 930 atoms
+
+Performance: 718876061.241 ns/day, 0.000 hours/ns, 3328.130 timesteps/s
+96.2% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.82723    | 0.82723    | 0.82723    |   0.0 | 27.53
+Bond    | 0.88996    | 0.88996    | 0.88996    |   0.0 | 29.62
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.020248   | 0.020248   | 0.020248   |   0.0 |  0.67
+Output  | 0.34798    | 0.34798    | 0.34798    |   0.0 | 11.58
+Modify  | 0.86751    | 0.86751    | 0.86751    |   0.0 | 28.87
+Other   |            | 0.05175    |            |       |  1.72
+
+Nlocal:            930 ave         930 max         930 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          19788 ave       19788 max       19788 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 19788
+Ave neighs/atom = 21.277419
+Ave special neighs/atom = 24.477419
+Neighbor list builds = 0
+Dangerous builds = 0
+
+velocity Left_Grip set -0.0500 NULL 0
+velocity Right_Grip set 0.0500 NULL 0
+
+run 10000
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 4.5 is shorter than a bond length based estimate of 4.7. This may lead to errors. (src/comm.cpp:727)
+Per MPI rank memory allocation (min/avg/max) = 13.33 | 13.33 | 13.33 Mbytes
+   Step         TotEng         Press          v_SZZ          v_SXX         v_strain         v_Fx           v_Fy           v_Fz     
+     11000   1.4062164     -1.1895087e-06  105440.9       49933.986     -3.1792124      3.55331e-15   -4.6918849e-17  1.2276421e-15
+     20000   2.0752357     -8.6629629e-07  108736.96      25328.842     -3.4721812     -1.2836954e-16  2.016616e-17   1.2251485e-16
+     21000   2.1433747     -8.0799617e-07  106049.21      21483.046     -3.5047333      1.171372e-15  -7.3454697e-18 -3.298143e-16 
+Loop time of 2.92669 on 1 procs for 10000 steps with 930 atoms
+
+Performance: 738035294.693 ns/day, 0.000 hours/ns, 3416.830 timesteps/s
+96.6% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.75803    | 0.75803    | 0.75803    |   0.0 | 25.90
+Bond    | 0.88702    | 0.88702    | 0.88702    |   0.0 | 30.31
+Neigh   | 0.0016738  | 0.0016738  | 0.0016738  |   0.0 |  0.06
+Comm    | 0.020363   | 0.020363   | 0.020363   |   0.0 |  0.70
+Output  | 0.34627    | 0.34627    | 0.34627    |   0.0 | 11.83
+Modify  | 0.862      | 0.862      | 0.862      |   0.0 | 29.45
+Other   |            | 0.05133    |            |       |  1.75
+
+Nlocal:            930 ave         930 max         930 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          18046 ave       18046 max       18046 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 18046
+Ave neighs/atom = 19.404301
+Ave special neighs/atom = 24.477419
+Neighbor list builds = 1
+Dangerous builds = 0
+
+velocity Left_Grip set 0.0500 NULL 0
+velocity Right_Grip set -0.0500 NULL 0
+
+run 100000
+Generated 0 of 3 mixed pair_coeff terms from geometric mixing rule
+WARNING: Communication cutoff 4.5 is shorter than a bond length based estimate of 4.7. This may lead to errors. (src/comm.cpp:727)
+Per MPI rank memory allocation (min/avg/max) = 13.33 | 13.33 | 13.33 Mbytes
+   Step         TotEng         Press          v_SZZ          v_SXX         v_strain         v_Fx           v_Fy           v_Fz     
+     21000   2.1433747     -8.0799617e-07  106049.21     -4435.4101     -3.5047333      1.2424957e-15  1.1736489e-17 -3.2114068e-16
+     30000   2.2919273     -1.8638757e-07  30027.962     -54309.556     -3.2117645      2.6624536e-14 -5.2041704e-18  3.593046e-15 
+     40000   2.6498395      5.8389802e-07 -91417.312     -50824.485     -2.8862437      3.4313047e-14 -3.9031278e-17 -6.6593432e-14
+     50000   2.3525585      7.0086034e-07 -139944.63     -30444.088     -2.5607228     -1.6290485e-13 -1.4636729e-17 -5.6730662e-14
+     60000   1.9539245      5.7878216e-07 -155338.71     -3154.1147     -2.235202       1.3460934e-13 -7.0689982e-17  5.502738e-14 
+     70000   1.6753715      6.3329627e-07 -151458.72      12715.163     -1.9096812     -2.7727538e-13 -2.8622937e-17 -7.6747419e-15
+     80000   1.5080013      1.1866835e-06 -237001.76      31055.545     -1.5841603      1.6159752e-11 -6.7789741e-17 -1.8972519e-11
+     90000   1.8052236      1.0092127e-06 -228642.52      38235.984     -1.2586395     -4.110534e-11  -7.1991024e-17  7.4678718e-12
+    100000   2.1495473     -8.8550602e-08 -36418.731      29286.65      -0.93311867     2.7639186e-11 -4.4235449e-17 -9.2367134e-11
+    110000   2.8489136     -1.5375274e-06  274574.22      25334.609     -0.60759784     5.5297062e-11  1.4528309e-17  3.1503485e-11
+    120000   3.3653452     -1.3757213e-06  259832.5      -15606.107     -0.282077       7.2309369e-11 -1.2576745e-17 -4.8631034e-11
+    121000   3.4159025     -1.4475549e-06  280365.07     -17107.082     -0.24952492     1.6615556e-10 -7.5894152e-19  1.5563428e-11
+Loop time of 56.7303 on 1 procs for 100000 steps with 930 atoms
+
+Performance: 380748934.105 ns/day, 0.000 hours/ns, 1762.727 timesteps/s
+97.8% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 34.198     | 34.198     | 34.198     |   0.0 | 60.28
+Bond    | 9.0698     | 9.0698     | 9.0698     |   0.0 | 15.99
+Neigh   | 0.057328   | 0.057328   | 0.057328   |   0.0 |  0.10
+Comm    | 0.20976    | 0.20976    | 0.20976    |   0.0 |  0.37
+Output  | 3.5942     | 3.5942     | 3.5942     |   0.0 |  6.34
+Modify  | 9.0765     | 9.0765     | 9.0765     |   0.0 | 16.00
+Other   |            | 0.5248     |            |       |  0.93
+
+Nlocal:            930 ave         930 max         930 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:              0 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          86586 ave       86586 max       86586 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 86586
+Ave neighs/atom = 93.103226
+Ave special neighs/atom = 24.477419
+Neighbor list builds = 17
+Dangerous builds = 0
+
+#velocity Left_Grip set -0.0500 NULL 0
+#velocity Right_Grip set 0.0500 NULL 0
+
+#run 10000
+
+#velocity Left_Grip set 0.0500 NULL 0
+#velocity Right_Grip set -0.0500 NULL 0
+
+#run 10000
+
+
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
+
+
+##velocity Right_Grip set 0.0500 NULL 0
+##velocity Left_Grip set -0.0500 NULL 0
+
+##fix				GPa2	all		ave/time	${NEvery}	${NRepeat}	${NFreq} 	v_SZZ	v_Fx  v_Fy v_Fz v_strain v_ETens v_diameter file	out.contract.csv
+
+##run         50000
+Total wall time: 0:01:03

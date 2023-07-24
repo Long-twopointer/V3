@@ -1,0 +1,96 @@
+##----------------------------------------------------------------------------##
+# Add Simulation Info! #
+##----------------------------------------------------------------------------##
+
+##----------------------------------------------------------------------------##
+clear
+##----------------------------------------------------------------------------##
+
+##---------------------------Variable Setup-----------------------------------##
+variable timestep equal 0.0025
+variable stencil_points equal 3
+variable Temp equal 300
+variable Volume equal (4/3)*3.1415*(3.5)^3
+variable		PRate	equal	1.0e-1	# Pull rate of the tensile deformation in A/ps
+variable		N		equal	1e3		# Data & dump ouptput frequency
+variable		NEvery	equal	1						# Use input values every this many timesteps
+variable		NRepeat	equal	$N/10					# No. of times to use input values for calculating averages
+variable		NFreq	equal	${NEvery}*${NRepeat}	# Calculate averages every this many timesteps
+variable		ETens	equal	${PRate}*time/7
+variable		EZZ		equal	v_ETens
+
+##----------------------------------------------------------------------------##
+
+##-----------------------Simulation Space Setup-------------------------------##
+units          micro
+dimension      3
+boundary       p p f
+atom_style     full
+##----------------------------------------------------------------------------##
+
+##--------------------Reading Cell Atom Data + Setting Masses -----------------##
+read_data diffusedsphre-longsimcell.lmpdat extra/bond/types 1 extra/bond/per/atom 5
+
+mass * 1
+
+neighbor 3.5 bin
+##----------------------------------------------------------------------------##
+
+##-----------------------Group Setup------------------------------------------##
+region Right_Grip block EDGE -3.2 EDGE EDGE EDGE EDGE
+region Left_Grip block 3.5 EDGE EDGE EDGE EDGE EDGE
+region Cell_Body block -3.5 3.5 EDGE EDGE EDGE EDGE
+
+group Cell_1 type 1 1
+group Right_Grip region Right_Grip
+group Left_Grip region Left_Grip
+group Cell_Body region Cell_Body
+
+##-------------------Pair and Bond Style and Coeff Setup-----------------------##
+pair_style	bpm/spring
+pair_coeff	1 1 0.0 1.0 1.0
+bond_style harmonic
+bond_coeff 1 1.00 0.9
+create_bonds many Cell_1 Cell_1 1 0.25 0.9     # Create Bonds here bc coeffs need to be set first
+min_style cg
+minimize 1.0e-7 1.0e-7 100 1000
+dump	1 	all	custom	5	dump.minimization id	type x y z vx	vy	vz	fx	fy	fz
+fix mysf1 Right_Grip setforce 0 NULL 0
+fix mysf2 Left_Grip setforce 0 NULL 0
+velocity Right_Grip set -0.0500 NULL 0
+velocity Left_Grip set 0.0500 NULL 0
+#velocity Right_Grip set 0 NULL 0
+#velocity Left_Grip set 0 NULL 0
+
+##----------------------------------------------------------------------------##
+##---------------------------------Fixes--------------------------------------##
+fix   FL all lb/fluid 1 1.0 1 stencil ${stencil_points} dx 1.2 dm .001 noise 300.0 2759 #zwall_velocity 1 -1 #dumpxdmf 500 fflow 0
+fix   2 all lb/viscous
+fix   3 all nve
+fix   4 all lb/momentum 1
+
+compute			Stress	Cell_Body	stress/atom	NULL
+compute			BodySt	Cell_Body	reduce	sum	c_Stress[1]
+variable		SigZZ	equal	c_BodySt/${Volume}*1.0e-4
+variable		SZZ		equal	v_SigZZ
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
+##--------------------Final Run Settings + Start------------------------------##
+timestep    ${timestep}
+thermo      100
+#run_style verlet
+dump			output		all		custom	100	dump.expand id	type x y z vx	vy	vz	fx	fy	fz
+#dump_modify output element cell
+fix				GPa		all		ave/time	${NEvery}	${NRepeat}	${NFreq} v_ETens	v_SZZ		file	out.part1.csv
+
+
+
+run         10000
+
+
+fix				GPa		all		ave/time	${NEvery}	${NRepeat}	${NFreq} v_ETens	v_SZZ		file	out.part2.csv
+
+run 10000
+
+##----------------------------------------------------------------------------##
+##----------------------------------------------------------------------------##
