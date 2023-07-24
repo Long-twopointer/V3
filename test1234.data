@@ -1,9 +1,10 @@
-data.data
+test1234.data
 
 2500 atoms
 1 atom types
-0 bonds
 1 bond types
+1 angle types
+1 dihedral types
 0.0 100 xlo xhi
 0.0 100 ylo yhi
 0.0 100 zlo zhi
@@ -2510,7 +2511,6 @@ Atoms
 2498 1 1 47 50 64 
 2499 1 1 49 50 65 
 2500 1 1 50 50 65 
-
 
 Bonds
 
