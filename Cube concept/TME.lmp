@@ -1,0 +1,48 @@
+#I am attempting to do something amazing. This will be awesome no doubt about it
+#Goal of the simulation is to create a working model of an OFF LATTICE CENTER BASED MODEL of Pancreatic Tissue. The ECM will be coarse grain modeled.
+
+units micro
+atom_style sphere
+boundary p p p
+dimension 3
+region simbox block 0 100 0 100 0 100
+create_box 2 simbox
+#pair_style lj/cut 5.8
+
+pair_style hybrid/overlay lj/cut 5.8 gran/hooke 200000 700000 50 30 5 0 limit_damping
+comm_modify vel yes
+lattice sc 1
+region BMem block EDGE EDGE EDGE EDGE 10 10.5
+create_atoms 1 region BMem
+set atom 1 diameter 8
+region layer1 block EDGE EDGE EDGE EDGE 12 13
+#region layer1p plane 50 50 10 0 0 1  #This was a plane concept.
+create_atoms 2 region layer1
+group layer1 region layer1
+set atom 2 diameter 8
+group BMem region BMem
+
+pair_coeff 1 1 lj/cut 1.0 3 2.5
+pair_coeff 1 2 lj/cut 0.1 3 2.5
+pair_coeff 2 2 lj/cut 0.1 3 2.5
+pair_coeff 1 1 gran/hooke
+pair_coeff 1 2 gran/hooke
+pair_coeff 2 2 gran/hooke
+#pair_coeff 1 1 granular dmt 1000.0 50.0 0.3 0.0 tangential mindlin NULL 0.5 0.5 rolling sds 500.0 200.0 0.5 twisting marshall
+#pair_coeff 1 2 granular dmt 1000.0 50.0 0.3 0.0 tangential mindlin NULL 0.5 0.5 rolling sds 500.0 200.0 0.5 twisting marshall
+#pair_coeff 2 2 granular dmt 1000.0 50.0 0.3 10.0 tangential mindlin NULL 0.5 0.1 rolling sds 500.0 200.0 0.1 twisting marshall
+fix 1 BMem setforce 0 0 0
+
+#pair_coeff * *
+write_data test.DATA
+dump			output		all		custom	10	dump.e3 id	type x y z vx	vy	vz	fx	fy	fz
+#thermo 1
+min_style cg
+minimize 1e-6 1e-6 1000 1000
+
+#fix 1 all npt/body temp 300.0 300.0 100.0 iso 0.0 0.0 1000.0 #This could possibly be done on the regular computer with a
+#velocity layer1 create 100 249 mom yes rot yes dist gaussian
+# 2 all nve
+
+#run_style verlet
+#run 2000

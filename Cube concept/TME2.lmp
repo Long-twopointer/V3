@@ -1,0 +1,79 @@
+#I am attempting to do something amazing. This will be awesome no doubt about it
+#Goal of the simulation is to create a working model of an OFF LATTICE CENTER BASED MODEL of Pancreatic Tissue. The ECM will be coarse grain modeled.
+##The units for Stress in micro are kPa
+units micro
+atom_style hybrid sphere full
+boundary p p p
+dimension 3
+region simbox block -10 100 -10 100 -5 200 side in
+create_box 3 simbox bond/types 1 extra/bond/per/atom 10
+read_data contreras.data add append shift 50 50 100
+#pair_style lj/cut 5.8
+pair_style hybrid/overlay lj/cut 5.8 gran/hooke 3 18 50 30 5 0 limit_damping morse 2.5 #We know that Kn is (4E/13.5) and Kt is (8E/4.5). I have selected a Young's modulus of 10
+comm_modify vel yes
+comm_modify cutoff 10                                                      #in accordance with Xiaoting Liang et al's findings. This is VARIABLE AND CAN BE VARIED
+lattice sc 10
+region BMem block 0 102.5 0 100 0.5 1
+create_atoms 1 region BMem
+
+region layer1  block EDGE 90 EDGE EDGE 3 7 side in
+bond_style harmonic
+bond_coeff 1 0.30 10
+
+create_atoms 2 region layer1
+group layer1 region layer1
+
+
+region layer2 block EDGE EDGE EDGE EDGE 20 30
+create_atoms 2 region layer2
+group layer2 region layer2
+#fix 5 all deposit 200 2 100 777 region layer1 gaussian 5.0 5.0 9.0 1.0 units box
+#set atom 1 diameter 50
+set atom 2 diameter 10
+set atom 3 diameter 10
+group BMem region BMem
+region ECM block -2.5 49 0 100 15 23 side in
+create_atoms 3 region ECM
+group ECM region ECM
+
+
+#read_data diffused_sphre-longsimcell.lmpdat add append 4 0 0 0 0 shift 0 0 30
+#create_atoms 2 region layer2
+pair_coeff 1 1 lj/cut 1 5 10
+pair_coeff 1 2 lj/cut 100 5 10
+pair_coeff 2 2 lj/cut 1 5 10
+pair_coeff 2 3 lj/cut 0 5 10
+pair_coeff * * lj/cut 10 5 10
+pair_coeff 1 1 gran/hooke
+pair_coeff 1 2 gran/hooke
+pair_coeff 2 2 gran/hooke
+pair_coeff * * gran/hooke
+pair_coeff * * morse 0 10 10 10
+pair_coeff 2 3 morse 10 10 10 10
+pair_coeff 3 3 morse 0 10 10 10
+displace_atoms ECM move 2.5 0 -12 #The shift is to ensure that the atoms are interspersed
+create_bonds many ECM ECM 1 1 10
+#pair_coeff 1 1 granular dmt 1000.0 50.0 0.3 0.0 tangential mindlin NULL 0.5 0.5 rolling sds 500.0 200.0 0.5 twisting marshall
+#pair_coeff 1 2 granular dmt 1000.0 50.0 0.3 0.0 tangential mindlin NULL 0.5 0.5 rolling sds 500.0 200.0 0.5 twisting marshall
+#pair_coeff 2 2 granular dmt 1000.0 50.0 0.3 10.0 tangential mindlin NULL 0.5 0.1 rolling sds 500.0 200.0 0.1 twisting marshall
+fix 1 BMem setforce 0 0 0
+#fix 2 all lb/fluid 1 1.0 0.0009982071 dx 1 dm 0.001
+#fix   22 all lb/viscous
+#fix   3 all nve
+#fix   4 all lb/momentum 1
+#region ECM block 0 100 0 100 0 20
+#create_atoms 3 region ECM
+#pair_coeff * *
+write_data test.DATA
+dump			output		all		custom	10	dump.ERIKISASWEDE id	type x y z vx	vy	vz	fx	fy	fz
+thermo 100
+min_style cg
+minimize 1e-3 1e-3 100 100
+fix 5 all dt/reset 10 1.0e-5 0.01 0.1
+fix 40 layer2 gravity 9.8 vector 0 0 -10
+fix 7 ECM spring tether 50.0 NULL NULL NULL 5.0
+fix 6 all nve
+#fix DIFUSSION layer1 gravity 1 vector 0 0 -1
+run 700
+#unfix DIFFUSION
+run 1300
